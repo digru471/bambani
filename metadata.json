@@ -1,0 +1,5 @@
+{
+  "name": "Courier Mitra Clone",
+  "description": "A React and Tailwind CSS clone of a courier tracking website, providing a clean interface for users to track their shipments across various carriers.",
+  "requestFramePermissions": []
+}

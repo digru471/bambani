@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { User, Shipment, Page } from '../App';
 import { api } from '../api';
-import { SpinnerIcon, SearchIcon, ShoppingCartIcon, TruckIcon, ClockIcon, ArchiveBoxIcon } from './IconComponents';
+import { SpinnerIcon, SearchIcon, ShoppingCartIcon, TruckIcon, ClockIcon, ArchiveBoxIcon, ChevronDownIcon, ChevronUpIcon } from './IconComponents';
 
 interface DashboardProps {
   user: User;
@@ -73,12 +73,17 @@ const EmptyChartPlaceholder: React.FC<{ message: string }> = ({ message }) => (
     </div>
 );
 
+type SortableKeys = 'trackingId' | 'courier' | 'origin' | 'destination' | 'status';
 
 const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate }) => {
   const [shipments, setShipments] = useState<Shipment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [filterStatus, setFilterStatus] = useState<'All' | 'In Transit' | 'Delivered'>('All');
+  const [sortConfig, setSortConfig] = useState<{ key: SortableKeys | null; direction: 'ascending' | 'descending' }>({
+    key: null,
+    direction: 'ascending',
+  });
 
   useEffect(() => {
     const fetchShipments = async () => {
@@ -115,12 +120,59 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate }) => {
     };
   }, [shipments]);
 
-  const filteredShipments = useMemo(() => {
-    if (filterStatus === 'All') {
-      return shipments;
+  const sortedAndFilteredShipments = useMemo(() => {
+    let sortableItems = [...shipments];
+
+    // Filtering
+    if (filterStatus !== 'All') {
+      sortableItems = sortableItems.filter(s => s.status === filterStatus);
     }
-    return shipments.filter(s => s.status === filterStatus);
-  }, [shipments, filterStatus]);
+
+    // Sorting
+    if (sortConfig.key !== null) {
+      sortableItems.sort((a, b) => {
+        const valA = a[sortConfig.key!];
+        const valB = b[sortConfig.key!];
+        
+        if (valA < valB) {
+          return sortConfig.direction === 'ascending' ? -1 : 1;
+        }
+        if (valA > valB) {
+          return sortConfig.direction === 'ascending' ? 1 : -1;
+        }
+        return 0;
+      });
+    }
+
+    return sortableItems;
+  }, [shipments, filterStatus, sortConfig]);
+
+  const requestSort = (key: SortableKeys) => {
+    let direction: 'ascending' | 'descending' = 'ascending';
+    if (sortConfig.key === key && sortConfig.direction === 'ascending') {
+      direction = 'descending';
+    }
+    setSortConfig({ key, direction });
+  };
+  
+  const getSortIcon = (key: SortableKeys) => {
+    if (sortConfig.key !== key) {
+        return <ChevronDownIcon className="w-4 h-4 text-gray-300" />;
+    }
+    if (sortConfig.direction === 'ascending') {
+        return <ChevronUpIcon className="w-4 h-4 text-gray-600" />;
+    }
+    return <ChevronDownIcon className="w-4 h-4 text-gray-600" />;
+  };
+
+  const SortableHeader: React.FC<{ sortKey: SortableKeys; children: React.ReactNode; }> = ({ sortKey, children }) => (
+    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+      <button onClick={() => requestSort(sortKey)} className="flex items-center space-x-1 group focus:outline-none">
+        <span className={`${sortConfig.key === sortKey ? 'text-gray-900' : 'group-hover:text-gray-800'}`}>{children}</span>
+        {getSortIcon(sortKey)}
+      </button>
+    </th>
+  );
 
 
   if (isLoading) {
@@ -209,19 +261,19 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate }) => {
                 </div>
 
                 <div className="overflow-x-auto">
-                    {filteredShipments.length > 0 ? (
+                    {sortedAndFilteredShipments.length > 0 ? (
                         <table className="min-w-full divide-y divide-gray-200">
                             <thead className="bg-gray-50">
                                 <tr>
-                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tracking ID</th>
-                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Courier</th>
-                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Origin</th>
-                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Destination</th>
-                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                    <SortableHeader sortKey="trackingId">Tracking ID</SortableHeader>
+                                    <SortableHeader sortKey="courier">Courier</SortableHeader>
+                                    <SortableHeader sortKey="origin">Origin</SortableHeader>
+                                    <SortableHeader sortKey="destination">Destination</SortableHeader>
+                                    <SortableHeader sortKey="status">Status</SortableHeader>
                                 </tr>
                             </thead>
                             <tbody className="bg-white divide-y divide-gray-200">
-                                {filteredShipments.map(shipment => (
+                                {sortedAndFilteredShipments.map(shipment => (
                                     <tr 
                                       key={shipment.id} 
                                       onClick={() => onNavigate('shipment-detail', shipment.id)} 

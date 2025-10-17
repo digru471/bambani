@@ -83,7 +83,7 @@ const App: React.FC = () => {
       case 'home':
         return (
           <>
-            <Hero />
+            <Hero onNavigate={handleNavigate} />
             <Couriers />
             <HowItWorks />
             <Features />
@@ -113,8 +113,8 @@ const App: React.FC = () => {
         }
         return <Dashboard user={user} onNavigate={handleNavigate} />;
       case 'shipment-detail':
-        if (!user || !pageData) {
-          handleNavigate('login');
+        if (!pageData) {
+          handleNavigate('home');
           return null;
         }
         return <ShipmentDetail user={user} shipmentId={pageData} onNavigate={handleNavigate} />;

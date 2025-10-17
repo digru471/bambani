@@ -73,6 +73,15 @@ export const api = {
     return shipment;
   },
 
+  getShipmentByTrackingId: async (trackingId: string, courier: string): Promise<Shipment> => {
+    await delay(1000);
+    const shipment = shipments.find(s => s.trackingId.toLowerCase() === trackingId.toLowerCase() && s.courier.toLowerCase() === courier.toLowerCase());
+    if (!shipment) {
+      throw new Error('Shipment not found. Please check the tracking ID and courier.');
+    }
+    return shipment;
+  },
+
   bookShipment: async (userId: string, courier: string, details: { origin: string, destination: string }): Promise<Shipment> => {
     await delay(1500);
     const user = users.find(u => u.id === userId);

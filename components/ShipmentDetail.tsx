@@ -4,7 +4,7 @@ import { api } from '../api';
 import { SpinnerIcon } from './IconComponents';
 
 interface ShipmentDetailProps {
-  user: User;
+  user: User | null;
   shipmentId: string;
   onNavigate: (page: Page) => void;
 }
@@ -22,11 +22,10 @@ const ShipmentDetail: React.FC<ShipmentDetailProps> = ({ user, shipmentId, onNav
   
   const fetchShipment = async () => {
     // Don't set loading to true on refetch, to avoid flicker
-    // setIsLoading(true);
     try {
       const fetchedShipment = await api.getShipmentById(shipmentId);
-      // Security check: regular users can only see their own shipments
-      if (user.role !== 'admin' && fetchedShipment.userId !== user.id) {
+      // Security check: regular users can only see their own shipments if logged in
+      if (user && user.role !== 'admin' && fetchedShipment.userId !== user.id) {
           setError('Access denied. You do not have permission to view this shipment.');
           setShipment(null);
       } else {
@@ -40,10 +39,28 @@ const ShipmentDetail: React.FC<ShipmentDetailProps> = ({ user, shipmentId, onNav
     }
   }
 
+  // Effect for the initial data load
   useEffect(() => {
     setIsLoading(true);
+    setError('');
     fetchShipment();
-  }, [shipmentId, user.id, user.role]);
+  }, [shipmentId, user?.id, user?.role]);
+
+  // Effect for polling every 30 seconds
+  useEffect(() => {
+    // Only start polling after initial load is complete and there are no errors.
+    if (isLoading || error) {
+      return;
+    }
+
+    const intervalId = setInterval(() => {
+      fetchShipment();
+    }, 30000); // Refresh every 30 seconds
+
+    // Clean up the interval when the component unmounts or dependencies change.
+    return () => clearInterval(intervalId);
+  }, [isLoading, error, shipmentId]);
+
 
   const handleUpdateStatus = async (e: React.FormEvent) => {
       e.preventDefault();
@@ -55,7 +72,7 @@ const ShipmentDetail: React.FC<ShipmentDetailProps> = ({ user, shipmentId, onNav
       setUpdateError('');
       try {
         await api.updateShipmentStatus(shipment.id, newStatus, newLocation);
-        // Refetch to show updated data
+        // Refetch to show updated data immediately
         await fetchShipment();
         setNewStatus('');
         setNewLocation('');
@@ -74,6 +91,9 @@ const ShipmentDetail: React.FC<ShipmentDetailProps> = ({ user, shipmentId, onNav
     );
   }
 
+  const backDestination = user ? (user.role === 'admin' ? 'admin' : 'dashboard') : 'home';
+  const backButtonText = user ? 'Back to List' : 'Track Another Shipment';
+
   if (error || !shipment) {
     return (
       <main className="flex items-center justify-center min-h-[calc(100vh-128px)] bg-gray-50 py-12 px-4">
@@ -81,10 +101,10 @@ const ShipmentDetail: React.FC<ShipmentDetailProps> = ({ user, shipmentId, onNav
             <h2 className="text-2xl font-bold text-red-600">Error</h2>
             <p className="mt-2 text-gray-700">{error || 'Shipment not found.'}</p>
             <button
-                onClick={() => onNavigate(user.role === 'admin' ? 'admin' : 'dashboard')}
+                onClick={() => onNavigate(backDestination)}
                 className="mt-6 bg-blue-600 text-white px-4 py-2 rounded-md font-medium hover:bg-blue-700 transition-colors"
             >
-                Back to Dashboard
+                {backButtonText}
             </button>
         </div>
       </main>
@@ -94,7 +114,7 @@ const ShipmentDetail: React.FC<ShipmentDetailProps> = ({ user, shipmentId, onNav
   return (
     <main className="min-h-[calc(100vh-128px)] bg-gray-50 py-12">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-        <button onClick={() => onNavigate(user.role === 'admin' ? 'admin' : 'dashboard')} className="text-blue-600 hover:text-blue-800 mb-4">&larr; Back to List</button>
+        <button onClick={() => onNavigate(backDestination)} className="text-blue-600 hover:text-blue-800 mb-4">&larr; {backButtonText}</button>
         <div className="bg-white rounded-lg shadow-md p-8">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 border-b pb-6">
                 <div>
@@ -152,7 +172,7 @@ const ShipmentDetail: React.FC<ShipmentDetailProps> = ({ user, shipmentId, onNav
                 </ul>
             </div>
 
-            {user.role === 'admin' && (
+            {user && user.role === 'admin' && (
                 <div className="mt-10 border-t pt-8">
                     <h2 className="text-2xl font-bold text-gray-800 mb-4">Update Status (Admin)</h2>
                     <form onSubmit={handleUpdateStatus} className="space-y-4 max-w-lg">

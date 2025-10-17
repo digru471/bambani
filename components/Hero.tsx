@@ -1,11 +1,19 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { COURIERS } from '../constants';
+import { Page } from '../App';
+import { api } from '../api';
 // Fix: Corrected import path for IconComponents
-import { ChevronDownIcon } from './IconComponents';
+import { ChevronDownIcon, SpinnerIcon } from './IconComponents';
 
-const Hero: React.FC = () => {
+interface HeroProps {
+  onNavigate: (page: Page, data?: any) => void;
+}
+
+const Hero: React.FC<HeroProps> = ({ onNavigate }) => {
   const [trackingId, setTrackingId] = useState('');
   const [trackingIdError, setTrackingIdError] = useState('');
+  const [isTracking, setIsTracking] = useState(false);
+  const [apiError, setApiError] = useState('');
 
   const [selectedCourier, setSelectedCourier] = useState(COURIERS[0].name);
   const [searchTerm, setSearchTerm] = useState(COURIERS[0].name);
@@ -14,8 +22,6 @@ const Hero: React.FC = () => {
   const dropdownRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
-
-  const [trackingResult, setTrackingResult] = useState<string | null>(null);
 
   const filteredCouriers = COURIERS.filter(courier =>
     courier.name.toLowerCase().includes(searchTerm.toLowerCase())
@@ -40,16 +46,24 @@ const Hero: React.FC = () => {
     }
   }, [activeIndex, isDropdownOpen]);
 
-  const handleTrack = () => {
+  const handleTrack = async () => {
     setTrackingIdError('');
-    setTrackingResult(null);
+    setApiError('');
 
     if (!trackingId.trim()) {
       setTrackingIdError('Please enter a valid tracking ID.');
       return;
     }
     
-    setTrackingResult(`Simulating tracking for ID: ${trackingId} with ${selectedCourier}. In a real app, this would show shipment status.`);
+    setIsTracking(true);
+    try {
+        const shipment = await api.getShipmentByTrackingId(trackingId, selectedCourier);
+        onNavigate('shipment-detail', shipment.id);
+    } catch (err: any) {
+        setApiError(err.message || 'An unexpected error occurred.');
+    } finally {
+        setIsTracking(false);
+    }
   };
   
   const handleSelectCourier = (courierName: string) => {
@@ -160,6 +174,7 @@ const Hero: React.FC = () => {
                   onChange={(e) => {
                     setTrackingId(e.target.value);
                     if (trackingIdError) setTrackingIdError('');
+                    if (apiError) setApiError('');
                   }}
                   aria-invalid={!!trackingIdError}
                   aria-describedby="tracking-id-error"
@@ -170,16 +185,17 @@ const Hero: React.FC = () => {
             </div>
             <button
               type="submit"
-              className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold p-4 rounded-md transition duration-300 flex items-center justify-center text-lg"
+              disabled={isTracking}
+              className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold p-4 rounded-md transition duration-300 flex items-center justify-center text-lg disabled:bg-orange-400"
             >
-              <svg className="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-              Track
+              {isTracking ? <SpinnerIcon className="animate-spin w-6 h-6 mr-2" /> : <svg className="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>}
+              {isTracking ? 'Tracking...' : 'Track'}
             </button>
           </form>
         </div>
-        {trackingResult && (
-          <div className="mt-6 max-w-3xl mx-auto bg-blue-100 text-blue-800 p-4 rounded-md text-center" role="status" aria-live="polite">
-            {trackingResult}
+        {apiError && (
+          <div className="mt-6 max-w-3xl mx-auto bg-red-100 text-red-800 p-4 rounded-md text-center" role="alert">
+            {apiError}
           </div>
         )}
       </div>
